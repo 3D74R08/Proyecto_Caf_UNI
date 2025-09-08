@@ -7,13 +7,17 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
-# Instalar y cargar librerías necesarias
+# Instalar y cargar librerias necesarias
 if (!require(dplyr)) install.packages("dplyr")
 if (!require(ggplot2)) install.packages("ggplot2")
 if (!require(tidyr)) install.packages("tidyr")
+if (!require(knitr)) install.packages("knitr")
+if (!require(kableExtra)) install.packages("kableExtra")
 library(dplyr)
 library(ggplot2)
 library(tidyr)
+library(knitr)
+library(kableExtra)
 ```
 ## R Markdown
 ## 1. Definición del problema
@@ -43,33 +47,67 @@ Las inundaciones pluviales urbanas son un desafío global creciente debido al ca
 
 ### Variables disponibles y su significado
 El dataset contiene 17 variables:
-1. **segment_id** (categórica): Identificador único del segmento.
-2. **city_name** (categórica): Nombre de la ciudad (ej. "Colombo, Sri Lanka").
-3. **admin_ward** (categórica): Distrito o barrio administrativo.
-4. **latitude** (numérica): Latitud del segmento.
-5. **longitude** (numérica): Longitud del segmento.
-6. **catchment_id** (categórica): ID de la cuenca hidrológica.
-7. **elevation_m** (numérica): Elevación en metros, afecta el drenaje.
-8. **dem_source** (categórica): Fuente del modelo digital de elevación (ej. Copernicus_GLO-30_v2023).
-9. **land_use** (categórica): Uso del suelo (ej. Residential, Industrial, Roads, Green).
-10. **soil_group** (categórica): Grupo de suelo basado en infiltración (A: alta, D: baja).
-11. **drainage_density_km_per_km2** (numérica): Densidad de drenaje en km/km².
-12. **storm_drain_proximity_m** (numérica): Proximidad al drenaje de tormenta en metros.
-13. **storm_drain_type** (categórica): Tipo de drenaje (ej. CurbInlet, OpenChannel, None).
-14. **rainfall_source** (categórica): Fuente de datos de precipitación (ej. ERA5, IMD).
-15. **historical_rainfall_intensity_mm_hr** (numérica): Intensidad histórica de lluvia en mm/h.
-16. **return_period_years** (numérica): Período de retorno de eventos de lluvia (ej. 5, 25, 100).
-17. **risk_labels** (categórica): Etiquetas de riesgo (múltiple, ej. monitor, ponding_hotspot, low_lying).
+
+```{r}
+variables <- data.frame(
+  No = 1:17,  # Columna de enumeración
+  Variable = c(
+    "segment_id", "city_name", "admin_ward", "latitude", "longitude",
+    "catchment_id", "elevation_m", "dem_source", "land_use", "soil_group",
+    "drainage_density_km_per_km2", "storm_drain_proximity_m", "storm_drain_type",
+    "rainfall_source", "historical_rainfall_intensity_mm_hr", "return_period_years",
+    "risk_labels"
+  ),
+  Tipo = c(
+    "Categórica", "Categórica", "Categórica", "Numérica", "Numérica",
+    "Categórica", "Numérica", "Categórica", "Categórica", "Categórica",
+    "Numérica", "Numérica", "Categórica", "Categórica", "Numérica", "Numérica",
+    "Categórica"
+  ),
+  Descripción = c(
+    "Identificador único del segmento",
+    "Nombre de la ciudad (ej. 'Colombo, Sri Lanka')",
+    "Distrito o barrio administrativo",
+    "Latitud del segmento",
+    "Longitud del segmento",
+    "ID de la cuenca hidrológica",
+    "Elevación en metros, afecta el drenaje",
+    "Fuente del modelo digital de elevación (ej. Copernicus_GLO-30_v2023)",
+    "Uso del suelo (ej. Residential, Industrial, Roads, Green)",
+    "Grupo de suelo basado en infiltración (A: alta, D: baja)",
+    "Densidad de drenaje en km/km²",
+    "Proximidad al drenaje de tormenta en metros",
+    "Tipo de drenaje (ej. CurbInlet, OpenChannel, None)",
+    "Fuente de datos de precipitación (ej. ERA5, IMD)",
+    "Intensidad histórica de lluvia en mm/h",
+    "Período de retorno de eventos de lluvia (ej. 5, 25, 100)",
+    "Etiquetas de riesgo (múltiple, ej. monitor, ponding_hotspot, low_lying)"
+  )
+)
+
+# Generar la tabla con kableExtra
+kable(variables, booktabs = TRUE, longtable = TRUE, caption = "Descripción de las variables") %>%
+  kable_styling(latex_options = c("striped", "hold_position"), font_size = 10) %>%
+  column_spec(1, width = "1cm") %>%  # Ancho para la columna de enumeración
+  column_spec(2, width = "3.5cm") %>%  # Ancho para Variable
+  column_spec(3, width = "2.5cm") %>%  # Ancho para Tipo
+  column_spec(4, width = "8cm")       # Ancho ajustado para Descripción
+```
+
 
 ### Identificación de posibles problemas iniciales
+
 - **Valores faltantes**: Columnas como `elevation_m`, `soil_group`, `drainage_density_km_per_km2`, `storm_drain_proximity_m`, `storm_drain_type`, y `rainfall_source` presentan valores faltantes.
+
 - **Ruido**: Elevaciones negativas (ej. -3 m) pueden indicar áreas bajo el nivel del mar o errores sintéticos.
+
 - **Otros**: Posibles duplicados en `segment_id`, desbalance en ciudades (algunas con más segmentos), multicolinealidad (ej. `elevation_m` y `risk_labels` como `low_lying`), y etiquetas múltiples en `risk_labels` que requieren procesamiento.
 
 ## 3. Análisis Exploratorio de Datos (EDA) Básico
 
 ### 3.1 Carga y visualización general de los datos
 ```{r}
+knitr::opts_chunk$set(echo = FALSE)
 #Cargar el dataset
 data <- read.csv("urban_pluvial_flood_risk_dataset.csv")
 
