@@ -1,0 +1,231 @@
+---
+title: "Proyecto_Fase1"
+author: "Laura_Marlon_Andrés_Eduar"
+date: "2025-09-03"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+# Instalar y cargar librerías necesarias
+if (!require(dplyr)) install.packages("dplyr")
+if (!require(ggplot2)) install.packages("ggplot2")
+if (!require(tidyr)) install.packages("tidyr")
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+```
+## R Markdown
+## 1. Definición del problema
+
+### Descripción clara del problema
+El proyecto busca analizar el riesgo de inundaciones pluviales urbanas en segmentos micro-urbanos de ciudades globales, utilizando el dataset sintético `urban_pluvial_flood_risk_dataset.csv`. Este dataset proporciona información sobre factores como elevación, densidad de drenaje, uso del suelo, intensidad de lluvia histórica y etiquetas de riesgo. El objetivo es identificar patrones y correlaciones que permitan entender la vulnerabilidad a inundaciones y apoyar estrategias de mitigación y planificación urbana.
+
+### Justificación de su importancia
+Las inundaciones pluviales urbanas son un desafío global creciente debido al cambio climático, la urbanización rápida y la infraestructura de drenaje insuficiente. Según el Banco Mundial, las inundaciones afectan a más de 20 millones de personas anualmente, con pérdidas económicas que superan los $40 mil millones. Este análisis es crucial para desarrollar políticas de resiliencia urbana, especialmente en ciudades de países en desarrollo y desarrollados con alta densidad urbana. La minería de datos permite identificar áreas críticas y predecir riesgos, optimizando recursos para prevención.
+
+### Preguntas de investigación o hipótesis
+- **Preguntas**:
+  - ¿Qué ciudades presentan mayor frecuencia de etiquetas de riesgo como `ponding_hotspot` o `extreme_rain_history`?
+  - ¿Cómo influyen el uso del suelo (`land_use`) y el grupo de suelo (`soil_group`) en el riesgo de inundaciones?
+  - ¿Qué variables numéricas (elevación, intensidad de lluvia, densidad de drenaje) tienen mayor correlación con el riesgo?
+- **Hipótesis**:
+  - H1: Segmentos con baja elevación (`elevation_m < 10`) y baja densidad de drenaje (`drainage_density_km_per_km2 < 5`) tienen mayor probabilidad de etiquetas como `low_lying`.
+  - H2: Áreas con uso del suelo `Residential` o `Commercial` y grupo de suelo `D` (baja infiltración) presentan mayor riesgo de `ponding_hotspot`.
+
+## 2. Descripción del dataset
+
+### Nombre y fuente del dataset
+- **Nombre**: Urban Pluvial Flood Risk Dataset (Global City Analysis 2025)
+- **Fuente**: Kaggle, subido por Pratyush Puri ([enlace](https://www.kaggle.com/datasets/pratyushpuri/urban-flood-risk-data-global-city-analysis-2025/data))
+- **Archivo principal**: `urban_pluvial_flood_risk_dataset.csv`
+- **Detalles**: Dataset sintético con ~2963 registros de segmentos urbanos en 58 ciudades globales, enfocado en factores de riesgo de inundaciones pluviales.
+
+### Variables disponibles y su significado
+El dataset contiene 17 variables:
+1. **segment_id** (categórica): Identificador único del segmento.
+2. **city_name** (categórica): Nombre de la ciudad (ej. "Colombo, Sri Lanka").
+3. **admin_ward** (categórica): Distrito o barrio administrativo.
+4. **latitude** (numérica): Latitud del segmento.
+5. **longitude** (numérica): Longitud del segmento.
+6. **catchment_id** (categórica): ID de la cuenca hidrológica.
+7. **elevation_m** (numérica): Elevación en metros, afecta el drenaje.
+8. **dem_source** (categórica): Fuente del modelo digital de elevación (ej. Copernicus_GLO-30_v2023).
+9. **land_use** (categórica): Uso del suelo (ej. Residential, Industrial, Roads, Green).
+10. **soil_group** (categórica): Grupo de suelo basado en infiltración (A: alta, D: baja).
+11. **drainage_density_km_per_km2** (numérica): Densidad de drenaje en km/km².
+12. **storm_drain_proximity_m** (numérica): Proximidad al drenaje de tormenta en metros.
+13. **storm_drain_type** (categórica): Tipo de drenaje (ej. CurbInlet, OpenChannel, None).
+14. **rainfall_source** (categórica): Fuente de datos de precipitación (ej. ERA5, IMD).
+15. **historical_rainfall_intensity_mm_hr** (numérica): Intensidad histórica de lluvia en mm/h.
+16. **return_period_years** (numérica): Período de retorno de eventos de lluvia (ej. 5, 25, 100).
+17. **risk_labels** (categórica): Etiquetas de riesgo (múltiple, ej. monitor, ponding_hotspot, low_lying).
+
+### Identificación de posibles problemas iniciales
+- **Valores faltantes**: Columnas como `elevation_m`, `soil_group`, `drainage_density_km_per_km2`, `storm_drain_proximity_m`, `storm_drain_type`, y `rainfall_source` presentan valores faltantes.
+- **Ruido**: Elevaciones negativas (ej. -3 m) pueden indicar áreas bajo el nivel del mar o errores sintéticos.
+- **Otros**: Posibles duplicados en `segment_id`, desbalance en ciudades (algunas con más segmentos), multicolinealidad (ej. `elevation_m` y `risk_labels` como `low_lying`), y etiquetas múltiples en `risk_labels` que requieren procesamiento.
+
+## 3. Análisis Exploratorio de Datos (EDA) Básico
+
+### 3.1 Carga y visualización general de los datos
+```{r}
+#Cargar el dataset
+data <- read.csv("urban_pluvial_flood_risk_dataset.csv")
+
+# Mostrar las primeras filas
+head(data, n=5)
+
+# Dimensiones
+cat("Filas:", nrow(data), "\nColumnas:", ncol(data), "\n")
+```
+
+### 3.2 Estadísticas básicas
+```{r}
+# Tipos de variables
+str(data)
+
+# Estadísticas para variables numéricas
+summary(data[c("elevation_m", "drainage_density_km_per_km2", 
+               "storm_drain_proximity_m", "historical_rainfall_intensity_mm_hr", 
+               "return_period_years")])
+
+# Media, mediana y desviación estándar (ejemplo para elevation_m)
+mean_elevation <- mean(data$elevation_m, na.rm=TRUE)
+median_elevation <- median(data$elevation_m, na.rm=TRUE)
+sd_elevation <- sd(data$elevation_m, na.rm=TRUE)
+cat("Elevation_m: Media =", mean_elevation, " Mediana =", median_elevation, 
+    " SD =", sd_elevation, "\n")
+
+# Frecuencias de variables categóricas
+table(data$land_use)
+prop.table(table(data$land_use)) * 100
+
+table(data$soil_group)
+prop.table(table(data$soil_group)) * 100
+
+table(data$city_name)
+```
+
+### 3.3 Detección de valores faltantes
+```{r}
+# Contar valores faltantes por columna
+colSums(is.na(data))
+
+# Porcentaje de valores faltantes
+colMeans(is.na(data)) * 100
+```
+
+### 3.4 Análisis adicional: Distribución de uso del suelo por grupo de suelo
+```{r}
+# Seleccionar columnas
+data_subset <- data %>% select(city_name, admin_ward, catchment_id, land_use, soil_group)
+
+# Frecuencias de land_use
+land_use_counts <- table(data_subset$land_use)
+cat("Cantidad de usos del suelo:\n")
+print(land_use_counts)
+
+# Uso del suelo más común
+max_land_use <- names(which.max(land_use_counts))
+count_land_use <- max(land_use_counts)
+cat("Uso de suelo mas comun:", max_land_use, "\nFrecuencia:", count_land_use, "\n")
+
+# Tabla cruzada
+tabla <- table(data_subset$soil_group, data_subset$land_use)
+tabla_df <- as.data.frame.table(tabla)
+
+# Gráfico de barras apiladas
+ggplot(tabla_df, aes(x=Var1, y=Freq, fill=Var2)) +
+  geom_bar(stat="identity", position="stack") +
+  labs(title="Distribucion de Uso del Suelo por Clase de Infiltracion",
+       x="Clase de Infiltracion (soil_group)", y="Numero de segmentos") +
+  scale_fill_discrete(name="Uso del suelo") +
+  theme_minimal() +
+  theme(legend.position="right")
+```
+
+## 4. Revisión bibliográfica
+
+### Estudios previos relacionados
+- **UN-Habitat (2020)**: Destaca que las inundaciones urbanas son un riesgo creciente en ciudades de Asia y África debido a la urbanización y el cambio climático. Recomienda análisis de datos espaciales para identificar zonas vulnerables.
+- **Jha et al. (2012)**: En "Cities and Flooding," se analizan factores como densidad de drenaje y uso del suelo en inundaciones pluviales, usando modelos GIS y regresión.
+- **Tingsanchali (2012)**: Estudio sobre Bangkok mostró que la baja elevación y alta impermeabilización aumentan el riesgo de inundaciones, usando modelos hidrológicos.
+
+### Métodos usados en investigaciones similares
+- **Análisis exploratorio**: Histogramas, boxplots y mapas de calor para correlaciones (usando R o Python).
+- **Modelos predictivos**: Regresión logística, árboles de decisión y redes neuronales para predecir riesgos de inundación.
+- **Análisis espacial**: Herramientas GIS (ArcGIS, QGIS) para mapear elevación y drenaje.
+- **Técnicas de preprocesamiento**: Imputación de valores faltantes (media, mediana, KNN) y normalización de variables numéricas.
+
+## 5. Plan de trabajo
+
+### Metodología general
+1. **Preprocesamiento**:
+   - Limpieza: Imputar valores faltantes (ej. media para numéricas, moda para categóricas).
+   - Procesar `risk_labels` separando etiquetas múltiples.
+   - Verificar duplicados y valores atípicos.
+2. **EDA avanzado**:
+   - Visualizaciones: Mapas de calor (correlaciones), boxplots por ciudad, mapas con `latitude`/`longitude`.
+   - Correlaciones entre variables numéricas y `risk_labels`.
+3. **Modelado**:
+   - Clustering (K-means) para agrupar segmentos por riesgo.
+   - Regresión logística o árboles de decisión para predecir `risk_labels`.
+4. **Validación**: Dividir datos (70% entrenamiento, 30% prueba), evaluar métricas (precisión, F1-score).
+
+### Cronograma de actividades
+- Semana 1-2: EDA básico, limpieza inicial, revisión bibliográfica.
+- Semana 3-4: Preprocesamiento avanzado, visualizaciones.
+- Semana 5-6: Modelado inicial (clustering, regresión).
+- Semana 7: Validación y redacción del informe final.
+- Semana 8: Preparación de la sustentación.
+
+### Herramientas y lenguajes
+- **Lenguaje**: R (análisis, visualización, modelado).
+- **Paquetes**: `dplyr`, `ggplot2`, `tidyr`, `caret` (modelado), `sf` (análisis espacial).
+- **Herramientas**: RStudio, R Markdown para informes.
+
+## 6. Expectativas y retos
+
+### Posibles dificultades
+- **Valores faltantes**: ~10% en `elevation_m`, `soil_group`, etc., pueden sesgar resultados.
+- **Datos sintéticos**: Elevaciones negativas o distribuciones no realistas.
+- **Complejidad de risk_labels**: Etiquetas múltiples requieren parsing (ej. separar `ponding_hotspot|low_lying`).
+- **Desbalance**: Algunas ciudades o usos del suelo pueden estar sobrerrepresentados.
+
+### Estrategias para resolverlas
+- Imputar valores faltantes con media/mediana (numéricas) o moda (categóricas).
+- Validar elevaciones negativas con análisis geográfico (ej. confirmar si son áreas costeras).
+- Usar funciones de `tidyr` para separar `risk_labels`.
+- Aplicar técnicas de balanceo (submuestreo o sobremuestreo) si hay desbalance.
+
+## 7. Conclusión preliminar
+El análisis inicial del dataset `urban_pluvial_flood_risk_dataset.csv` revela un problema crítico de inundaciones urbanas, con variables como `elevation_m`, `drainage_density_km_per_km2`, y `historical_rainfall_intensity_mm_hr` clave para identificar riesgos. El EDA muestra valores faltantes (~10% en algunas columnas) y distribuciones variadas en `land_use` (Residential domina) y `soil_group`. Las hipótesis planteadas se explorarán con modelado predictivo. Los retos incluyen manejar datos faltantes y etiquetas múltiples, pero R ofrece herramientas robustas para avanzar. Este análisis sentará las bases para estrategias de mitigación en ciudades globales.
+
+```
+
+<!-- " -->
+<!-- ```{r setup, include=FALSE} -->
+<!-- knitr::opts_chunk$set(echo = TRUE) -->
+<!-- ``` -->
+
+<!-- ## R Markdown -->
+
+<!-- This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>. -->
+
+<!-- When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this: -->
+
+<!-- ```{r cars} -->
+<!-- summary(cars) -->
+<!-- ``` -->
+
+<!-- ## Including Plots -->
+
+<!-- You can also embed plots, for example: -->
+
+<!-- ```{r pressure, echo=FALSE} -->
+<!-- plot(pressure) -->
+<!-- ``` -->
+
+<!-- Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot. -->
+<!-- " -->
